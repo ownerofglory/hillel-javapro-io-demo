@@ -8,10 +8,21 @@ import ua.ithillel.io.adapter.othersystem.USAInfoSystem;
 import ua.ithillel.io.decorator.notifier.DefaultNotifier;
 import ua.ithillel.io.decorator.notifier.Notifier;
 import ua.ithillel.io.decorator.ownimpl.SmsNotifier;
+import ua.ithillel.io.logger.*;
+import ua.ithillel.io.server.NonBlockingSimpleServer;
+import ua.ithillel.io.server.SimpleServer;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
 public class Application {
@@ -19,7 +30,88 @@ public class Application {
 
     private static InfoService infoService;
 
-    public static void main(String[] args) {
+    public static void main(String[] args)  {
+        try {
+            final NonBlockingSimpleServer nonBlockingSimpleServer = new NonBlockingSimpleServer(8000);
+            nonBlockingSimpleServer.start();
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        Path path = Paths.get("files/file.txt");  // nio alternative to File from io
+
+        try (final FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);) {
+
+            final ByteBuffer readBuffer = ByteBuffer.allocate(10);
+
+            int read;
+            final StringBuffer buffer = new StringBuffer();
+            while ((read = fileChannel.read(readBuffer)) != -1) {
+                readBuffer.flip();
+
+//                final CharBuffer charBuffer = readBuffer.asCharBuffer(); // UTF-16
+                final CharBuffer decode = StandardCharsets.UTF_8.decode(readBuffer);
+
+                byte b;
+                while (readBuffer.hasRemaining()) {
+                    b = readBuffer.get();
+                    buffer.append((char) b);
+                }
+//                buffer.append(new String(readBuffer.array()));
+
+                readBuffer.clear();
+            }
+
+            System.out.println(buffer);
+
+
+            final ByteBuffer writeBuffer = ByteBuffer.allocate(30);
+            writeBuffer.put("Hello".getBytes());
+            writeBuffer.flip();
+//            final ByteBuffer writeBuffer = ByteBuffer.wrap("Hello!".getBytes());
+
+            fileChannel.write(writeBuffer);
+
+
+            writeBuffer.put("Hello again".getBytes());
+            writeBuffer.flip();
+
+            fileChannel.write(writeBuffer);
+
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        try {
+            final SimpleServer simpleServer = new SimpleServer(8000);
+            simpleServer.start();
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        final LoggerConfig loadedConfig = FileLoggerConfigLoader.load("");
+        Logger logger = new FileLogger(loadedConfig);
+
+        // pasrse file
+        // create map
+
+        // shanpshot
+        final FileLoggerConfig config = FileLoggerConfig.builder()
+                .setFormat("[%s]")
+                .setPath("log.txt")
+                .build();
+
+        final String format = config.getFormat();
+
+        FileLoggerConfig.builder()
+                .setFormat(config.getFormat())
+                .setPath("new path");
 
         // d rwx rwx rwx
         // - rw- r-- r-- 644
